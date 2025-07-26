@@ -1,0 +1,43 @@
+{
+  "name": "qc-generator-whatsapp",
+  "version": "1.0.8",
+  "description": "Advanced generator for dynamic quote images and animations for WhatsApp",
+  "main": "index.js",
+  "files": [
+    "src",
+    "index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Terror-Machine/qc-generator-whatsapp.git"
+  },
+  "homepage": "https://github.com/Terror-Machine/qc-generator-whatsapp#readme",
+  "keywords": [
+    "brat",
+    "bratvid",
+    "animatedBrat",
+    "qc",
+    "quote",
+    "generator",
+    "image",
+    "canvas",
+    "sharp",
+    "text-to-image",
+    "text-to-animated"
+  ],
+  "author": "Terror-Machine",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.3",
+    "canvas": "^3.1.2",
+    "emoji-cache": "^1.0.0",
+    "emoji-db": "github:Terror-Machine/emoji-db#master",
+    "lru-cache": "^11.1.0",
+    "runes": "^0.4.3",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {},
+  "bugs": {
+    "url": "https://github.com/Terror-Machine/qc-generator-whatsapp/issues"
+  }
+}
