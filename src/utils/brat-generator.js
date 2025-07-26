@@ -1,9 +1,9 @@
-const { createCanvas, loadImage } = require('canvas');
 const fs = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 const EmojiDbLib = require("emoji-db");
-const Jimp = require('jimp');
 const ffmpeg = require('fluent-ffmpeg');
+const { createCanvas, loadImage } = require('canvas');
 const emojiImageByBrandPromise = require("emoji-cache");
 
 let emojiDb;
@@ -316,7 +316,7 @@ async function bratGenerator(teks, highlightWords = []) {
     let finalFontSize = 0;
     let lineHeight = 0;
     while (fontSize > 10) {
-      ctx.font = `bold ${fontSize}px Sans-serif`;
+      ctx.font = `${fontSize}px Arial`;
       const segments = parseTextToSegments(teks, ctx, fontSize);
       const lines = rebuildLinesFromSegments(segments, availableWidth);
       let isTooWide = false;
@@ -350,7 +350,7 @@ async function bratGenerator(teks, highlightWords = []) {
       if (contentSegments.length <= 1) {
         for (const segment of line) {
           if (segment.type === 'text') {
-            ctx.font = `bold ${finalFontSize}px Sans-serif`;
+            ctx.font = `${finalFontSize}px Arial`;
             ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? crot : "black";
             ctx.fillText(segment.content, x, y);
           } else if (segment.type === 'emoji') {
@@ -367,7 +367,7 @@ async function bratGenerator(teks, highlightWords = []) {
               ctx.fillStyle = '#EEEEEE';
               ctx.fillRect(x, y, emojiSize, emojiSize);
               ctx.fillStyle = "black";
-              ctx.font = `${finalFontSize / 3}px Sans-serif`;
+              ctx.font = `${finalFontSize / 3}px Arial`;
               ctx.fillText('?', x + emojiSize / 3, y + emojiSize / 2);
             }
           }
@@ -381,7 +381,7 @@ async function bratGenerator(teks, highlightWords = []) {
         for (let i = 0; i < contentSegments.length; i++) {
           const segment = contentSegments[i];
           if (segment.type === 'text') {
-            ctx.font = `bold ${finalFontSize}px Sans-serif`;
+            ctx.font = `${finalFontSize}px Arial`;
             ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? crot : "black";
             ctx.fillText(segment.content, currentX, y);
           } else if (segment.type === 'emoji') {
@@ -398,7 +398,7 @@ async function bratGenerator(teks, highlightWords = []) {
               ctx.fillStyle = '#EEEEEE';
               ctx.fillRect(currentX, y, emojiSize, emojiSize);
               ctx.fillStyle = "black";
-              ctx.font = `${finalFontSize / 3}px Sans-serif`;
+              ctx.font = `${finalFontSize / 3}px Arial`;
               ctx.fillText('?', currentX + emojiSize / 3, y + emojiSize / 2);
             }
           }
@@ -418,9 +418,9 @@ async function bratGenerator(teks, highlightWords = []) {
       throw error;
     }
     try {
-      image = await Jimp.read(buffer);
-      image.blur(2);
-      const blurredBuffer = await image.getBufferAsync(Jimp.MIME_PNG);
+      const blurredBuffer = await sharp(buffer)
+        .blur(3)
+        .toBuffer();
       return blurredBuffer;
     } catch (error) {
       console.error('Error processing image with Jimp:', error);
