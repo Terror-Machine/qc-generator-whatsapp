@@ -30,7 +30,7 @@ function isHighlighted(highlightWords, word) {
   try {
     if (!Array.isArray(highlightWords)) throw new TypeError('highlightWords must be an array');
     if (typeof word !== 'string') throw new TypeError('word must be a string');
-    return highlightWords.includes(word);
+    return highlightWords.includes(word.toLowerCase());
   } catch (error) {
     console.error('Error in isHighlighted: ', error);
     throw error;
