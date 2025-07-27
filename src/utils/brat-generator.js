@@ -133,6 +133,48 @@ function rebuildLinesFromSegments(segments, maxWidth) {
   }
 }
 
+async function drawSegment(ctx, segment, x, y, fontSize, lineHeight, textColor, emojiCache) {
+  try {
+    if (!ctx || typeof ctx.fillText !== 'function') {
+      throw new Error('Invalid canvas context');
+    }
+    if (!segment || typeof segment.type !== 'string') {
+      throw new Error('Invalid segment object');
+    }
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = Math.max(2, fontSize / 15);
+    ctx.lineJoin = 'round';
+
+    if (segment.type === 'text') {
+      if (typeof segment.content !== 'string') {
+        throw new Error('Invalid text segment content');
+      }
+      ctx.strokeText(segment.content, x, y);
+      ctx.fillStyle = textColor;
+      ctx.fillText(segment.content, x, y);
+    } else if (segment.type === 'emoji') {
+      try {
+        if (!emojiCache[segment.content]) {
+          throw new Error(`Emoji ${segment.content} not found in cache`);
+        }
+        const emojiImg = await loadImage(Buffer.from(emojiCache[segment.content], 'base64'));
+        const emojiY = y + (lineHeight - fontSize) / 2;
+        ctx.drawImage(emojiImg, x, emojiY, fontSize, fontSize);
+      } catch (emojiError) {
+        console.error(`Failed to draw emoji: ${segment.content}`, emojiError);
+        ctx.fillStyle = '#EEEEEE';
+        ctx.fillRect(x, y, fontSize, fontSize);
+        ctx.fillStyle = textColor;
+        ctx.font = `${fontSize / 3}px Arial`;
+        ctx.fillText('?', x + fontSize / 3, y + fontSize / 2);
+      }
+    }
+  } catch (error) {
+    console.error('Error in drawSegment:', error);
+    throw error;
+  }
+}
+
 async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textColor = "#000000") {
   try {
     if (typeof text !== 'string' || text.trim().length === 0) {
@@ -158,7 +200,7 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
     }
     let sizeFound = false;
     while (fontSize > 10) {
-      tempCtx.font = `bold ${fontSize}px Arial`;
+      tempCtx.font = `${fontSize}px Arial`;
       const segments = parseTextToSegments(text, tempCtx, fontSize);
       const lines = rebuildLinesFromSegments(segments, availableWidth);
       let isTooWide = false;
@@ -192,7 +234,7 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
       }
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, width, height);
-      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.font = `${fontSize}px Arial`;
       ctx.textBaseline = 'top';
       const totalTextBlockHeight = finalLines.length * lineHeight;
       const startY = (height - totalTextBlockHeight) / 2;
@@ -239,48 +281,6 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
     return frames;
   } catch (error) {
     console.error('Error in bratVidGenerator:', error);
-    throw error;
-  }
-}
-
-async function drawSegment(ctx, segment, x, y, fontSize, lineHeight, textColor, emojiCache) {
-  try {
-    if (!ctx || typeof ctx.fillText !== 'function') {
-      throw new Error('Invalid canvas context');
-    }
-    if (!segment || typeof segment.type !== 'string') {
-      throw new Error('Invalid segment object');
-    }
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = Math.max(2, fontSize / 15);
-    ctx.lineJoin = 'round';
-
-    if (segment.type === 'text') {
-      if (typeof segment.content !== 'string') {
-        throw new Error('Invalid text segment content');
-      }
-      ctx.strokeText(segment.content, x, y);
-      ctx.fillStyle = textColor;
-      ctx.fillText(segment.content, x, y);
-    } else if (segment.type === 'emoji') {
-      try {
-        if (!emojiCache[segment.content]) {
-          throw new Error(`Emoji ${segment.content} not found in cache`);
-        }
-        const emojiImg = await loadImage(Buffer.from(emojiCache[segment.content], 'base64'));
-        const emojiY = y + (lineHeight - fontSize) / 2;
-        ctx.drawImage(emojiImg, x, emojiY, fontSize, fontSize);
-      } catch (emojiError) {
-        console.error(`Failed to draw emoji: ${segment.content}`, emojiError);
-        ctx.fillStyle = '#EEEEEE';
-        ctx.fillRect(x, y, fontSize, fontSize);
-        ctx.fillStyle = textColor;
-        ctx.font = `${fontSize / 3}px Arial`;
-        ctx.fillText('?', x + fontSize / 3, y + fontSize / 2);
-      }
-    }
-  } catch (error) {
-    console.error('Error in drawSegment:', error);
     throw error;
   }
 }
@@ -340,8 +340,6 @@ async function bratGenerator(teks, highlightWords = []) {
     if (finalFontSize === 0) {
       throw new Error('Text is too large for the specified dimensions');
     }
-    const randomWarna = ["blue", "green", "orange", "purple", "red"];
-    const crot = randomChoice(randomWarna);
     const totalFinalHeight = finalLines.length * lineHeight;
     let y = (height - totalFinalHeight) / 2;
     for (const [index, line] of finalLines.entries()) {
@@ -351,7 +349,7 @@ async function bratGenerator(teks, highlightWords = []) {
         for (const segment of line) {
           if (segment.type === 'text') {
             ctx.font = `${finalFontSize}px Arial`;
-            ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? crot : "black";
+            ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? "red" : "black";
             ctx.fillText(segment.content, x, y);
           } else if (segment.type === 'emoji') {
             const emojiSize = finalFontSize * 1.2;
@@ -382,7 +380,7 @@ async function bratGenerator(teks, highlightWords = []) {
           const segment = contentSegments[i];
           if (segment.type === 'text') {
             ctx.font = `${finalFontSize}px Arial`;
-            ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? crot : "black";
+            ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? "red" : "black";
             ctx.fillText(segment.content, currentX, y);
           } else if (segment.type === 'emoji') {
             const emojiSize = finalFontSize * 1.2;
