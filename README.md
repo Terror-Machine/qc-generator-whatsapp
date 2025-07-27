@@ -218,12 +218,16 @@ const path = require('path');
 async function generateTextAnimation() {
   try {
     // Buat frame-frame animasi
+    const text = "Animasi teks muncul satu per satu ✨"
+    const highlightWords = ["teks", "per"];
+
     const frames = await bratVidGenerator(
-      "Animasi teks muncul satu per satu ✨",
+      text,
       512, 
       512,
       "#FFFFFF",
-      "#FF5733"
+      "#FF5733",
+      highlightWords
     );
 
     // Simpan frame sementara
@@ -312,9 +316,10 @@ Fungsi `generate` mengembalikan sebuah `Promise` yang akan resolve menjadi sebua
    - `text`: String teks yang akan dirender
    - `highlightWords`: Array kata-kata yang akan dihighlight
 
-2. **`bratVidGenerator(text, width, height, bgColor, textColor)`**
+2. **`bratVidGenerator(text, width, height, bgColor, textColor, highlightWords)`**
    - Membuat frame-frame animasi teks
    - Mengembalikan array buffer gambar PNG
+   - `highlightWords`: Array kata-kata yang akan dihighlight
 
 3. **`generateAnimatedBratVid(frameDir, outputPath)`**
    - Menggabungkan frame menjadi animasi WebP
@@ -338,6 +343,10 @@ GPL v3 - [Lihat lengkap](https://github.com/Terror-Machine/qc-generator-whatsapp
 Fungsi utama kode ini adalah hasil modifikasi dari repositori [quote-api oleh LyoSU](https://github.com/LyoSU/quote-api). 
 
 Terima kasih untuk [@LyoSU](https://github.com/LyoSU) dan semua kontributor di repositori tersebut.
+
+# Example
+
+you can check [here](https://github.com/Terror-Machine/fnbots) to see my project with qc-generator-whatsapp productions.
 
 ## 🌟 Contoh Output
 
