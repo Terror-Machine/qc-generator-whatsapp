@@ -1,6 +1,6 @@
 {
   "name": "qc-generator-whatsapp",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Advanced generator for dynamic quote images and animations for WhatsApp",
   "main": "index.js",
   "files": [
