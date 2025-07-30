@@ -425,11 +425,11 @@ class QuoteGenerate {
         styledWord.style.includes("mention") &&
         styledWord.style.includes("monospace")
       ) {
-        fillStyle = "#387fff";
+        fillStyle = "#005740";
       } else if (styledWord.style.includes("mention")) {
-        fillStyle = "#0000ff";
+        fillStyle = "#007AFF";
       } else if (styledWord.style.includes("monospace")) {
-        fillStyle = "#6ab7ec";
+        fillStyle = "#008069";
       } else {
         fillStyle = fontColor;
       }
@@ -591,7 +591,7 @@ class QuoteGenerate {
       if (styledWord.style.includes("bold")) fontType += "bold ";
       if (styledWord.style.includes("italic")) fontType += "italic ";
       if (styledWord.style.includes("monospace")) fontName = "NotoSansMono";
-      if (styledWord.style.includes("mention")) fillStyle = "#0000ff";
+      if (styledWord.style.includes("mention")) fillStyle = "#007AFF";
       ctx.font = `${fontType}${fontSize}px "${fontName}"`;
       ctx.fillStyle = fillStyle;
       if (styledWord.emoji) {
@@ -645,10 +645,10 @@ class QuoteGenerate {
       if (styledWord.style.includes("italic")) fontType += "italic ";
       if (styledWord.style.includes("monospace")) {
         fontName = "NotoSansMono";
-        fillStyle = "#6ab7ec";
+        fillStyle = "#008069";
       }
       if (styledWord.style.includes("mention")) {
-        fillStyle = "#0000ff";
+        fillStyle = "#007AFF";
       }
       ctx.font = `${fontType}${fontSize}px "${fontName}"`;
       ctx.fillStyle = fillStyle;
