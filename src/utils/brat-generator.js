@@ -234,9 +234,10 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
       while (fontSize > 10) {
         const segmentsForSizing = recalculateSegmentWidths(currentSegments, fontSize, tempCtx);
         const lines = rebuildLinesFromSegments(segmentsForSizing, availableWidth);
+        const isTooWide = lines.some(line => line.reduce((sum, seg) => sum + seg.width, 0) > availableWidth);
         const currentLineHeight = fontSize * lineHeightMultiplier;
         const totalTextHeight = lines.length * currentLineHeight;
-        if (totalTextHeight <= height - (padding * 2)) {
+        if (totalTextHeight <= height - (padding * 2) && !isTooWide) {
           finalLines = lines;
           lineHeight = currentLineHeight;
           break;
