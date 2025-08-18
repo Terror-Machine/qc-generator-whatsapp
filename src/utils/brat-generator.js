@@ -308,9 +308,19 @@ async function bratGenerator(teks, highlightWords = []) {
     let finalFontSize = 0;
     let lineHeight = 0;
     while (fontSize > 10) {
-      const segments = parseTextToSegments(teks, ctx, fontSize);
-      const lines = rebuildLinesFromSegments(segments, availableWidth);
-      let isTooWide = lines.some(line => line.reduce((sum, seg) => sum + seg.width, 0) > availableWidth);
+      let segments = parseTextToSegments(teks, ctx, fontSize);
+      let lines = rebuildLinesFromSegments(segments, availableWidth);
+      let isTooWide = lines.some(line => {
+        const contentWidth = line
+          .filter(seg => seg.type !== 'whitespace')
+          .reduce((sum, seg) => sum + seg.width, 0);
+        return contentWidth > availableWidth;
+      });
+      if (lines.length === 1 && lines[0].filter(seg => seg.type !== 'whitespace').length === 2 && lines[0].some(seg => seg.type === 'text') && lines[0].some(seg => seg.type === 'emoji')) {
+        const textSeg = lines[0].find(seg => seg.type === 'text');
+        const emojiSeg = lines[0].find(seg => seg.type === 'emoji');
+        lines = [[textSeg], [emojiSeg]];
+      }
       const currentLineHeight = fontSize * lineHeightMultiplier;
       const totalTextHeight = lines.length * currentLineHeight;
       if (totalTextHeight <= height - 2 * verticalPadding && !isTooWide) {
