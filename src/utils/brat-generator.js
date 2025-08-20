@@ -51,61 +51,58 @@ function parseTextToSegments(text, ctx, fontSize) {
     if (!ctx || typeof ctx.measureText !== 'function') throw new TypeError('Invalid canvas context');
     const segments = [];
     const emojiSize = fontSize * 1.2;
-    const emojiData = emojiDb.searchFromText({ input: text, fixCodePoints: true });
-    let currentIndex = 0;
-    const processPlainText = (plainText) => {
-      if (!plainText) return;
-      const splitContentIntoWords = (content, type, font) => {
-        const wordRegex = /\S+|\s+/g;
-        const parts = content.match(wordRegex) || [];
-        parts.forEach(part => {
-          const isWhitespace = /^\s+$/.test(part);
-          ctx.font = font;
-          segments.push({
-            type: isWhitespace ? 'whitespace' : type,
-            content: part,
-            width: ctx.measureText(part).width
-          });
-        });
-      };
-      const tokenizerRegex = /(\*_.*?_\*|_\*.*?\*_)|(\*.*?\*)|(_.*?_)|(~.*?~)|(```.*?```)|(\s+)|([^*_~`\s]+)/g;
+    const emojiMatches = emojiDb.searchFromText({ input: text, fixCodePoints: true });
+    const processChunk = (chunk) => {
+      if (!chunk) return;
+      const tokenizerRegex = /(\*_.*?_\*|_\*.*?\*_)|(\*.*?\*)|(_.*?_)|(~.*?~)|(```.*?```)|(\s+)|([^\s*~_`]+)/g;
       let match;
-      while ((match = tokenizerRegex.exec(plainText)) !== null) {
+      while ((match = tokenizerRegex.exec(chunk)) !== null) {
         const [fullMatch, boldItalic, bold, italic, strikethrough, monospace, whitespace, textContent] = match;
         if (boldItalic) {
-          splitContentIntoWords(boldItalic.slice(2, -2), 'bolditalic', `bold italic ${fontSize}px Arial`);
+          const content = boldItalic.slice(2, -2);
+          ctx.font = `bold italic ${fontSize}px Arial`;
+          segments.push({ type: 'bolditalic', content, width: ctx.measureText(content).width });
         } else if (bold) {
-          splitContentIntoWords(bold.slice(1, -1), 'bold', `bold ${fontSize}px Arial`);
+          const content = bold.slice(1, -1);
+          ctx.font = `bold ${fontSize}px Arial`;
+          segments.push({ type: 'bold', content, width: ctx.measureText(content).width });
         } else if (italic) {
-          splitContentIntoWords(italic.slice(1, -1), 'italic', `italic ${fontSize}px Arial`);
+          const content = italic.slice(1, -1);
+          ctx.font = `italic ${fontSize}px Arial`;
+          segments.push({ type: 'italic', content, width: ctx.measureText(content).width });
         } else if (strikethrough) {
-          splitContentIntoWords(strikethrough.slice(1, -1), 'strikethrough', `${fontSize}px Arial`);
+          const content = strikethrough.slice(1, -1);
+          ctx.font = `${fontSize}px Arial`;
+          segments.push({ type: 'strikethrough', content, width: ctx.measureText(content).width });
         } else if (monospace) {
-          splitContentIntoWords(monospace.slice(3, -3), 'monospace', `${fontSize}px 'Courier New', monospace`);
+          const content = monospace.slice(3, -3);
+          ctx.font = `${fontSize}px 'Courier New', monospace`;
+          segments.push({ type: 'monospace', content, width: ctx.measureText(content).width });
         } else if (whitespace) {
+          ctx.font = `${fontSize}px Arial`;
           segments.push({ type: 'whitespace', content: whitespace, width: ctx.measureText(whitespace).width });
         } else if (textContent) {
+          ctx.font = `${fontSize}px Arial`;
           segments.push({ type: 'text', content: textContent, width: ctx.measureText(textContent).width });
         }
-        ctx.font = `${fontSize}px Arial`;
       }
     };
-    emojiData.forEach(emojiInfo => {
-      if (emojiInfo.offset > currentIndex) {
-        const plainText = text.substring(currentIndex, emojiInfo.offset);
-        processPlainText(plainText);
-      }
+    let lastIndex = 0;
+    emojiMatches.forEach(emojiInfo => {
+      const plainText = text.substring(lastIndex, emojiInfo.offset);
+      processChunk(plainText);
       segments.push({
         type: 'emoji',
         content: emojiInfo.found,
         width: emojiSize,
       });
-      currentIndex = emojiInfo.offset + emojiInfo.length;
+      lastIndex = emojiInfo.offset + emojiInfo.length;
     });
-    if (currentIndex < text.length) {
-      const remainingText = text.substring(currentIndex);
-      processPlainText(remainingText);
+    if (lastIndex < text.length) {
+      const remainingText = text.substring(lastIndex);
+      processChunk(remainingText);
     }
+    ctx.font = `${fontSize}px Arial`;
     return segments;
   } catch (error) {
     console.error('Error in parseTextToSegments:', error);
@@ -115,7 +112,7 @@ function parseTextToSegments(text, ctx, fontSize) {
 
 function rebuildLinesFromSegments(segments, maxWidth) {
   try {
-    if (!Array.isArray(segments))  throw new TypeError('Segments must be an array');
+    if (!Array.isArray(segments)) throw new TypeError('Segments must be an array');
     if (typeof maxWidth !== 'number' || maxWidth <= 0) throw new TypeError('Max width must be a positive number');
     const lines = [];
     if (segments.length === 0) return lines;
@@ -182,20 +179,37 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
     const tempCanvas = createCanvas(1, 1);
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) throw new Error('Failed to create canvas context');
-    const allSegments = parseTextToSegments(text, tempCtx, 100).filter(seg => seg.type !== 'whitespace');
-    if (allSegments.length === 0) throw new Error('No valid content segments found in the text');
+    const tokens = text.match(/\S+|\n/g) || [];
+    if (tokens.length === 0) throw new Error('No valid content tokens found in the text');
     let frames = [];
     const recalculateSegmentWidths = (segments, fontSize, ctx) => {
       return segments.map(seg => {
         let newWidth = seg.width;
         switch (seg.type) {
-          case 'bold': ctx.font = `bold ${fontSize}px Arial`; newWidth = ctx.measureText(seg.content).width; break;
-          case 'italic': ctx.font = `italic ${fontSize}px Arial`; newWidth = ctx.measureText(seg.content).width; break;
-          case 'bolditalic': ctx.font = `bold italic ${fontSize}px Arial`; newWidth = ctx.measureText(seg.content).width; break;
-          case 'monospace': ctx.font = `${fontSize}px 'Courier New', monospace`; newWidth = ctx.measureText(seg.content).width; break;
+          case 'bold':
+            ctx.font = `bold ${fontSize}px Arial`;
+            newWidth = ctx.measureText(seg.content).width;
+            break;
+          case 'italic':
+            ctx.font = `italic ${fontSize}px Arial`;
+            newWidth = ctx.measureText(seg.content).width;
+            break;
+          case 'bolditalic':
+            ctx.font = `bold italic ${fontSize}px Arial`;
+            newWidth = ctx.measureText(seg.content).width;
+            break;
+          case 'monospace':
+            ctx.font = `${fontSize}px 'Courier New', monospace`;
+            newWidth = ctx.measureText(seg.content).width;
+            break;
           case 'strikethrough':
-          case 'text': ctx.font = `${fontSize}px Arial`; newWidth = ctx.measureText(seg.content).width; break;
-          case 'emoji': newWidth = fontSize * 1.2; break;
+          case 'text':
+            ctx.font = `${fontSize}px Arial`;
+            newWidth = ctx.measureText(seg.content).width;
+            break;
+          case 'emoji':
+            newWidth = fontSize * 1.2;
+            break;
         }
         return { ...seg, width: newWidth };
       });
@@ -203,11 +217,21 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
     const renderSegment = async (ctx, segment, x, y, fontSize, lineHeight) => {
       ctx.fillStyle = isHighlighted(highlightWords, segment.content) ? "red" : textColor;
       switch (segment.type) {
-        case 'bold': ctx.font = `bold ${fontSize}px Arial`; break;
-        case 'italic': ctx.font = `italic ${fontSize}px Arial`; break;
-        case 'bolditalic': ctx.font = `bold italic ${fontSize}px Arial`; break;
-        case 'monospace': ctx.font = `${fontSize}px 'Courier New', monospace`; break;
-        default: ctx.font = `${fontSize}px Arial`; break;
+        case 'bold':
+          ctx.font = `bold ${fontSize}px Arial`;
+          break;
+        case 'italic':
+          ctx.font = `italic ${fontSize}px Arial`;
+          break;
+        case 'bolditalic':
+          ctx.font = `bold italic ${fontSize}px Arial`;
+          break;
+        case 'monospace':
+          ctx.font = `${fontSize}px 'Courier New', monospace`;
+          break;
+        default:
+          ctx.font = `${fontSize}px Arial`;
+          break;
       }
       if (segment.type === 'emoji') {
         const emojiSize = fontSize * 1.2;
@@ -225,20 +249,31 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
         }
       }
     };
-    for (let segmentCount = 1; segmentCount <= allSegments.length; segmentCount++) {
-      const currentSegments = allSegments.slice(0, segmentCount);
+    for (let i = 1; i <= tokens.length; i++) {
+      const frameTokens = tokens.slice(0, i);
+      const currentText = frameTokens.join(' ').replace(/ \n /g, '\n').replace(/\n /g, '\n').replace(/ \n/g, '\n');
+      if (currentText.trim() === '') continue;
       let fontSize = 200;
       let finalLines = [];
       let lineHeight = 0;
       const lineHeightMultiplier = 1.3;
       while (fontSize > 10) {
-        const segmentsForSizing = recalculateSegmentWidths(currentSegments, fontSize, tempCtx);
-        const lines = rebuildLinesFromSegments(segmentsForSizing, availableWidth);
-        const isTooWide = lines.some(line => line.reduce((sum, seg) => sum + seg.width, 0) > availableWidth);
+        let currentRenderLines = [];
+        const textLines = currentText.split('\n');
+        for (const singleLineText of textLines) {
+          if (singleLineText === '') {
+            currentRenderLines.push([]);
+            continue;
+          }
+          let segments = parseTextToSegments(singleLineText, tempCtx, fontSize);
+          let segmentsForSizing = recalculateSegmentWidths(segments, fontSize, tempCtx);
+          let wrappedLines = rebuildLinesFromSegments(segmentsForSizing, availableWidth);
+          currentRenderLines.push(...wrappedLines);
+        }
         const currentLineHeight = fontSize * lineHeightMultiplier;
-        const totalTextHeight = lines.length * currentLineHeight;
-        if (totalTextHeight <= height - (padding * 2) && !isTooWide) {
-          finalLines = lines;
+        const totalTextHeight = currentRenderLines.length * currentLineHeight;
+        if (totalTextHeight <= height - (padding * 2)) {
+          finalLines = currentRenderLines;
           lineHeight = currentLineHeight;
           break;
         }
@@ -266,11 +301,11 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
           const totalContentWidth = contentSegments.reduce((sum, seg) => sum + seg.width, 0);
           const spaceBetween = (availableWidth - totalContentWidth) / (contentSegments.length - 1);
           let positionX = padding;
-          for (let i = 0; i < contentSegments.length; i++) {
-            const segment = contentSegments[i];
+          for (let k = 0; k < contentSegments.length; k++) {
+            const segment = contentSegments[k];
             await renderSegment(ctx, segment, positionX, positionY, fontSize, lineHeight);
             positionX += segment.width;
-            if (i < contentSegments.length - 1) {
+            if (k < contentSegments.length - 1) {
               positionX += spaceBetween;
             }
           }
@@ -307,29 +342,53 @@ async function bratGenerator(teks, highlightWords = []) {
     let finalLines = [];
     let finalFontSize = 0;
     let lineHeight = 0;
+    const wordCount = (teks.trim().match(/(\p{L}|\p{N}|\p{Emoji_Presentation})+/gu) || []).length;
+    let lastKnownGoodSolution = null;
     while (fontSize > 10) {
-      let segments = parseTextToSegments(teks, ctx, fontSize);
-      let lines = rebuildLinesFromSegments(segments, availableWidth);
-      let isTooWide = lines.some(line => {
-        const contentWidth = line
-          .filter(seg => seg.type !== 'whitespace')
-          .reduce((sum, seg) => sum + seg.width, 0);
-        return contentWidth > availableWidth;
-      });
-      if (lines.length === 1 && lines[0].filter(seg => seg.type !== 'whitespace').length === 2 && lines[0].some(seg => seg.type === 'text') && lines[0].some(seg => seg.type === 'emoji')) {
-        const textSeg = lines[0].find(seg => seg.type === 'text');
-        const emojiSeg = lines[0].find(seg => seg.type === 'emoji');
-        lines = [[textSeg], [emojiSeg]];
+      let currentRenderLines = [];
+      const textLines = teks.split('\n');
+      for (const singleLineText of textLines) {
+        if (singleLineText === '') {
+          currentRenderLines.push([]);
+          continue;
+        }
+        let segments = parseTextToSegments(singleLineText, ctx, fontSize);
+        let wrappedLines = rebuildLinesFromSegments(segments, availableWidth);
+        currentRenderLines.push(...wrappedLines);
+      }
+      if (currentRenderLines.length === 1 && currentRenderLines[0].filter(seg => seg.type !== 'whitespace').length === 2 && currentRenderLines[0].some(seg => seg.type === 'text') && currentRenderLines[0].some(seg => seg.type === 'emoji')) {
+        const textSeg = currentRenderLines[0].find(seg => seg.type === 'text');
+        const emojiSeg = currentRenderLines[0].find(seg => seg.type === 'emoji');
+        currentRenderLines = [[textSeg], [emojiSeg]];
       }
       const currentLineHeight = fontSize * lineHeightMultiplier;
-      const totalTextHeight = lines.length * currentLineHeight;
-      if (totalTextHeight <= height - 2 * verticalPadding && !isTooWide) {
-        finalLines = lines;
-        finalFontSize = fontSize;
-        lineHeight = currentLineHeight;
-        break;
+      const totalTextHeight = currentRenderLines.length * currentLineHeight;
+      if (totalTextHeight <= height - 2 * verticalPadding) {
+        lastKnownGoodSolution = {
+          lines: currentRenderLines,
+          fontSize: fontSize,
+          lineHeight: currentLineHeight
+        };
+        if (wordCount === 4) {
+          if (currentRenderLines.length === 2) {
+            finalLines = currentRenderLines;
+            finalFontSize = fontSize;
+            lineHeight = currentLineHeight;
+            break;
+          }
+        } else {
+          finalLines = currentRenderLines;
+          finalFontSize = fontSize;
+          lineHeight = currentLineHeight;
+          break;
+        }
       }
       fontSize -= 2;
+    }
+    if (finalLines.length === 0 && lastKnownGoodSolution) {
+      finalLines = lastKnownGoodSolution.lines;
+      finalFontSize = lastKnownGoodSolution.fontSize;
+      lineHeight = lastKnownGoodSolution.lineHeight;
     }
     if (finalLines.length === 1 && finalLines[0].length === 1 && finalLines[0][0].type === 'text') {
       const theOnlyWord = finalLines[0][0].content;
@@ -392,14 +451,13 @@ async function bratGenerator(teks, highlightWords = []) {
         }
       } else {
         const totalContentWidth = contentSegments.reduce((sum, seg) => sum + seg.width, 0);
-        const numberOfGaps = contentSegments.length - 1;
-        const spacePerGap = (availableWidth - totalContentWidth) / numberOfGaps;
+        const spacePerGap = (availableWidth - totalContentWidth) / (contentSegments.length - 1);
         let currentX = margin;
         for (let i = 0; i < contentSegments.length; i++) {
           const segment = contentSegments[i];
           await renderSegment(segment, currentX, y);
           currentX += segment.width;
-          if (i < numberOfGaps) {
+          if (i < contentSegments.length - 1) {
             currentX += spacePerGap;
           }
         }
