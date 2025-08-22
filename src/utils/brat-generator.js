@@ -125,9 +125,6 @@ function rebuildLinesFromSegments(segments, maxWidth, ctx, fontSize) {
     let currentLine = [];
     let currentLineWidth = 0;
     segments.forEach(segment => {
-      if (segment.type === 'whitespace' && currentLine.length === 0) {
-        return;
-      }
       if (segment.type !== 'whitespace' && segment.type !== 'emoji' && segment.width > maxWidth) {
         if (currentLine.length > 0) {
           lines.push(currentLine);
@@ -152,6 +149,9 @@ function rebuildLinesFromSegments(segments, maxWidth, ctx, fontSize) {
         lines.push(currentLine);
         currentLine = [];
         currentLineWidth = 0;
+      }
+      if (segment.type === 'whitespace' && currentLine.length === 0) {
+        return;
       }
       currentLine.push(segment);
       currentLineWidth += segment.width;
