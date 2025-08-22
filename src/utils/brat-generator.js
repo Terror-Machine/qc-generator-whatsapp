@@ -54,30 +54,33 @@ function parseTextToSegments(text, ctx, fontSize) {
     const emojiMatches = emojiDb.searchFromText({ input: text, fixCodePoints: true });
     const processChunk = (chunk) => {
       if (!chunk) return;
+      const splitContentIntoWords = (content, type, font) => {
+        const wordRegex = /\S+|\s+/g;
+        const parts = content.match(wordRegex) || [];
+        parts.forEach(part => {
+          const isWhitespace = /^\s+$/.test(part);
+          ctx.font = font;
+          segments.push({
+            type: isWhitespace ? 'whitespace' : type,
+            content: part,
+            width: ctx.measureText(part).width
+          });
+        });
+      };
       const tokenizerRegex = /(\*_.*?_\*|_\*.*?\*_)|(\*.*?\*)|(_.*?_)|(~.*?~)|(```.*?```)|(\s+)|([^\s*~_`]+)/g;
       let match;
       while ((match = tokenizerRegex.exec(chunk)) !== null) {
         const [fullMatch, boldItalic, bold, italic, strikethrough, monospace, whitespace, textContent] = match;
         if (boldItalic) {
-          const content = boldItalic.slice(2, -2);
-          ctx.font = `bold italic ${fontSize}px Arial`;
-          segments.push({ type: 'bolditalic', content, width: ctx.measureText(content).width });
+          splitContentIntoWords(boldItalic.slice(2, -2), 'bolditalic', `bold italic ${fontSize}px Arial`);
         } else if (bold) {
-          const content = bold.slice(1, -1);
-          ctx.font = `bold ${fontSize}px Arial`;
-          segments.push({ type: 'bold', content, width: ctx.measureText(content).width });
+          splitContentIntoWords(bold.slice(1, -1), 'bold', `bold ${fontSize}px Arial`);
         } else if (italic) {
-          const content = italic.slice(1, -1);
-          ctx.font = `italic ${fontSize}px Arial`;
-          segments.push({ type: 'italic', content, width: ctx.measureText(content).width });
+          splitContentIntoWords(italic.slice(1, -1), 'italic', `italic ${fontSize}px Arial`);
         } else if (strikethrough) {
-          const content = strikethrough.slice(1, -1);
-          ctx.font = `${fontSize}px Arial`;
-          segments.push({ type: 'strikethrough', content, width: ctx.measureText(content).width });
+          splitContentIntoWords(strikethrough.slice(1, -1), 'strikethrough', `${fontSize}px Arial`);
         } else if (monospace) {
-          const content = monospace.slice(3, -3);
-          ctx.font = `${fontSize}px 'Courier New', monospace`;
-          segments.push({ type: 'monospace', content, width: ctx.measureText(content).width });
+          splitContentIntoWords(monospace.slice(3, -3), 'monospace', `${fontSize}px 'Courier New', monospace`);
         } else if (whitespace) {
           ctx.font = `${fontSize}px Arial`;
           segments.push({ type: 'whitespace', content: whitespace, width: ctx.measureText(whitespace).width });
@@ -86,6 +89,7 @@ function parseTextToSegments(text, ctx, fontSize) {
           segments.push({ type: 'text', content: textContent, width: ctx.measureText(textContent).width });
         }
       }
+      ctx.font = `${fontSize}px Arial`;
     };
     let lastIndex = 0;
     emojiMatches.forEach(emojiInfo => {
@@ -110,22 +114,45 @@ function parseTextToSegments(text, ctx, fontSize) {
   }
 }
 
-function rebuildLinesFromSegments(segments, maxWidth) {
+function rebuildLinesFromSegments(segments, maxWidth, ctx, fontSize) {
   try {
     if (!Array.isArray(segments)) throw new TypeError('Segments must be an array');
     if (typeof maxWidth !== 'number' || maxWidth <= 0) throw new TypeError('Max width must be a positive number');
+    if (!ctx || typeof ctx.measureText !== 'function') throw new TypeError('Invalid canvas context');
+    if (typeof fontSize !== 'number' || fontSize <= 0) throw new TypeError('Font size must be a positive number');
     const lines = [];
     if (segments.length === 0) return lines;
     let currentLine = [];
     let currentLineWidth = 0;
     segments.forEach(segment => {
-      if (!segment || typeof segment.width !== 'number') throw new TypeError('Invalid segment format');
+      if (segment.type === 'whitespace' && currentLine.length === 0) {
+        return;
+      }
+      if (segment.type !== 'whitespace' && segment.type !== 'emoji' && segment.width > maxWidth) {
+        if (currentLine.length > 0) {
+          lines.push(currentLine);
+        }
+        let tempWord = '';
+        ctx.font = getFontForSegment(segment.type, fontSize);
+        for (const char of segment.content) {
+          const testWord = tempWord + char;
+          const testWidth = ctx.measureText(testWord).width;
+          if (testWidth > maxWidth && tempWord.length > 0) {
+            lines.push([{ ...segment, content: tempWord, width: ctx.measureText(tempWord).width }]);
+            tempWord = char;
+          } else {
+            tempWord = testWord;
+          }
+        }
+        currentLine = [{ ...segment, content: tempWord, width: ctx.measureText(tempWord).width }];
+        currentLineWidth = ctx.measureText(tempWord).width;
+        return;
+      }
       if (currentLineWidth + segment.width > maxWidth && currentLine.length > 0) {
         lines.push(currentLine);
         currentLine = [];
         currentLineWidth = 0;
       }
-      if (segment.type === 'whitespace' && currentLine.length === 0) return;
       currentLine.push(segment);
       currentLineWidth += segment.width;
     });
@@ -136,6 +163,16 @@ function rebuildLinesFromSegments(segments, maxWidth) {
   } catch (error) {
     console.error('Error in rebuildLinesFromSegments: ', error);
     throw error;
+  }
+}
+
+function getFontForSegment(type, fontSize) {
+  switch (type) {
+    case 'bold': return `bold ${fontSize}px Arial`;
+    case 'italic': return `italic ${fontSize}px Arial`;
+    case 'bolditalic': return `bold italic ${fontSize}px Arial`;
+    case 'monospace': return `${fontSize}px 'Courier New', monospace`;
+    default: return `${fontSize}px Arial`;
   }
 }
 
@@ -267,7 +304,7 @@ async function bratVidGenerator(text, width, height, bgColor = "#FFFFFF", textCo
           }
           let segments = parseTextToSegments(singleLineText, tempCtx, fontSize);
           let segmentsForSizing = recalculateSegmentWidths(segments, fontSize, tempCtx);
-          let wrappedLines = rebuildLinesFromSegments(segmentsForSizing, availableWidth);
+          let wrappedLines = rebuildLinesFromSegments(segmentsForSizing, availableWidth, tempCtx, fontSize);
           currentRenderLines.push(...wrappedLines);
         }
         const currentLineHeight = fontSize * lineHeightMultiplier;
@@ -353,7 +390,7 @@ async function bratGenerator(teks, highlightWords = []) {
           continue;
         }
         let segments = parseTextToSegments(singleLineText, ctx, fontSize);
-        let wrappedLines = rebuildLinesFromSegments(segments, availableWidth);
+        let wrappedLines = rebuildLinesFromSegments(segments, availableWidth, ctx, fontSize);
         currentRenderLines.push(...wrappedLines);
       }
       if (currentRenderLines.length === 1 && currentRenderLines[0].filter(seg => seg.type !== 'whitespace').length === 2 && currentRenderLines[0].some(seg => seg.type === 'text') && currentRenderLines[0].some(seg => seg.type === 'emoji')) {
