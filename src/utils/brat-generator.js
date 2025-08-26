@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
 const EmojiDbLib = require("emoji-db");
-const ffmpeg = require('fluent-ffmpeg');
+const ffmpeg = require('@ts-ffmpeg/fluent-ffmpeg');
 const { createCanvas, loadImage } = require('canvas');
 const emojiImageByBrandPromise = require("emoji-cache");
 

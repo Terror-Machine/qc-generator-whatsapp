@@ -63,7 +63,7 @@ ffmpeg -version
 1. Pastikan FFmpeg terinstall di sistem
 2. Atau tentukan path manual:
    ```javascript
-   const ffmpeg = require('fluent-ffmpeg');
+   const ffmpeg = require('@ts-ffmpeg/fluent-ffmpeg');
    ffmpeg.setFfmpegPath('/path/to/ffmpeg');
    ```
 
